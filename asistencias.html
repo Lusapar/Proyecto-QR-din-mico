@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel de Asistencia - Administración</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: #fefefe;
+      color: #222;
+      font-family: "Poppins", sans-serif;
+    }
+    .btn-whatsapp {
+      background-color: #25D366;
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      transition: 0.3s;
+    }
+    .btn-whatsapp:hover {
+      background-color: #1ebe57;
+    }
+  </style>
+</head>
+<body class="p-6">
+
+  <h1 class="text-3xl font-bold mb-6 text-center">📋 Panel de Asistencia</h1>
+
+  <div class="flex justify-center gap-4 mb-6">
+    <select id="courseSelect" class="border rounded px-3 py-2">
+      <option value="">Selecciona un curso</option>
+      <option value="A - Informática">A - Informática</option>
+      <option value="B - Informática">B - Informática</option>
+    </select>
+    <button id="loadBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Cargar Asistencias</button>
+    <button id="downloadBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
+     ⬇️ Descargar Asistencia
+    </button>
+
+  </div>
+
+  <div id="stats" class="text-center mb-6 hidden">
+    <p><strong>✅ Asistidos:</strong> <span id="countAsistidos">0</span></p>
+    <p><strong>⚠️ Atrasos:</strong> <span id="countAtrasos">0</span></p>
+    <p><strong>❌ No Asistieron:</strong> <span id="countNoAsistidos">0</span></p>
+    <a id="whatsappLink" target="_blank" class="btn-whatsapp mt-4 inline-block">📱 Enviar Reporte al Tutor</a>
+  </div>
+
+  <h2 id="titleAsistencias" class="text-xl font-semibold mb-2 hidden">🧾 Asistencias de Hoy</h2>
+  <table class="w-full border-collapse border border-gray-300 hidden mb-6" id="tableAttendance">
+    <thead class="bg-gray-200">
+      <tr>
+        <th class="border p-2">ID</th>
+        <th class="border p-2">Nombre</th>
+        <th class="border p-2">Curso</th>
+        <th class="border p-2">Tutor</th>
+        <th class="border p-2">Estado</th>
+        <th class="border p-2">Fecha</th>
+      </tr>
+    </thead>
+    <tbody id="attendanceBody"></tbody>
+  </table>
+
+  <h2 id="titleNoAsistidos" class="text-xl font-semibold mb-2 hidden">🚫 No Asistieron Hoy</h2>
+  <table class="w-full border-collapse border border-gray-300 hidden" id="tableAbsent">
+    <thead class="bg-gray-200">
+      <tr>
+        <th class="border p-2">ID</th>
+        <th class="border p-2">Nombre</th>
+        <th class="border p-2">Curso</th>
+      </tr>
+    </thead>
+    <tbody id="absentBody"></tbody>
+  </table>
+
+<script>
+
+  const loadBtn = document.getElementById('loadBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const tableAttendance = document.getElementById('tableAttendance');
+  const tableAbsent = document.getElementById('tableAbsent');
+  const attendanceBody = document.getElementById('attendanceBody');
+  const absentBody = document.getElementById('absentBody');
+  const stats = document.getElementById('stats');
+  const whatsappLink = document.getElementById('whatsappLink');
+  const courseSelect = document.getElementById('courseSelect');
+
+  const apiBase = "http://localhost:3000";  
+  let cursoActual = "";                     
+
+
+  async function downloadCSV() {
+    const course = courseSelect.value;
+    if (!course) return alert("Selecciona un curso primero");
+
+    cursoActual = course;
+
+    const today = new Date().toISOString().split("T")[0];
+
+    
+    const studentsRes = await fetch(`${apiBase}/students?course=${encodeURIComponent(course)}`);
+    const studentsAll = await studentsRes.json();
+
+    const attendRes = await fetch(`${apiBase}/attendance?course=${encodeURIComponent(course)}`);
+    const attendances = await attendRes.json();
+
+    const mapToday = {};
+    attendances.forEach(a => {
+      if (a.date === today) mapToday[a.student_id] = a;
+    });
+
+    let csv = "ID,Nombre,Curso,Tutor,Estado,Fecha\n";
+
+    studentsAll.forEach(s => {
+      const record = mapToday[s.id];
+      if (record) {
+        csv += `${s.id},"${s.name}",${s.course},${record.tutor},${record.status},${record.date}\n`;
+      } else {
+        csv += `${s.id},"${s.name}",${s.course},,no asistió,${today}\n`;
+      }
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const dlLink = document.createElement("a");
+    dlLink.href = URL.createObjectURL(blob);
+    dlLink.download = `asistencia_${course.replace(/\s+/g, "_")}_${today}.csv`;
+    dlLink.click();
+  }
+
+
+  async function loadAttendance() {
+    const course = courseSelect.value;
+    if (!course) return alert("Selecciona un curso primero");
+
+    cursoActual = course; // 🔁 guardamos el curso elegido
+    const today = new Date().toISOString().split('T')[0];
+
+    const res = await fetch(`${apiBase}/attendance?course=${encodeURIComponent(course)}`);
+    const data = await res.json();
+
+    attendanceBody.innerHTML = "";
+    absentBody.innerHTML = "";
+
+    const hoy = data.filter(r => r.date === today);
+
+  
+    let asistidos = 0;
+    let atrasos = 0;
+
+    const atrasadosNombres = [];
+    const noAsistidosNombres = [];
+
+
+    hoy.forEach(r => {
+      if (r.status === "asistido") asistidos++;
+      else if (r.status === "atraso") {
+        atrasos++;
+        atrasadosNombres.push(r.name);
+      }
+
+      attendanceBody.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td class="border p-2">${r.student_id}</td>
+          <td class="border p-2">${r.name}</td>
+          <td class="border p-2">${r.course}</td>
+          <td class="border p-2">${r.tutor}</td>
+          <td class="border p-2">${r.status}</td>
+          <td class="border p-2">${r.date}</td>
+        </tr>
+      `);
+    });
+
+
+
+    const resStudents = await fetch(`${apiBase}/students?course=${encodeURIComponent(course)}`);
+    const studentsAll = await resStudents.json();
+
+    const asistidosIds = new Set(hoy.map(r => r.student_id));
+
+    const ausentes = studentsAll.filter(s => !asistidosIds.has(s.id));
+
+    ausentes.forEach(a => {
+      noAsistidosNombres.push(a.name);
+      absentBody.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td class="border p-2">${a.id}</td>
+          <td class="border p-2">${a.name}</td>
+          <td class="border p-2">${a.course}</td>
+        </tr>
+      `);
+    });
+
+    const noAsistidos = ausentes.length;
+
+   
+    document.getElementById('countAsistidos').textContent = asistidos;
+    document.getElementById('countAtrasos').textContent = atrasos;
+    document.getElementById('countNoAsistidos').textContent = noAsistidos;
+
+    stats.classList.remove('hidden');
+    tableAttendance.classList.remove('hidden');
+    tableAbsent.classList.remove('hidden');
+    document.getElementById('titleAsistencias').classList.remove('hidden');
+    document.getElementById('titleNoAsistidos').classList.remove('hidden');
+
+
+    const tutor = hoy.length ? hoy[0].tutor : "Tutor no encontrado";
+    const fecha = new Date().toLocaleDateString('es-EC');
+
+    let mensaje =
+      `Hola ${tutor}, aquí está el reporte de asistencia del curso ${course} (${fecha}):%0A%0A` +
+      `✅ Asistieron: ${asistidos}%0A` +
+      `⚠️ Atrasos: ${atrasos}%0A` +
+      `❌ No asistieron: ${noAsistidos}%0A`;
+
+    if (atrasadosNombres.length) {
+      mensaje += `%0A⚠️ *Atrasados:*%0A- ${atrasadosNombres.join('%0A- ')}`;
+    }
+    if (noAsistidosNombres.length) {
+      mensaje += `%0A%0A❌ *No asistieron:*%0A- ${noAsistidosNombres.join('%0A- ')}`;
+    }
+    mensaje += `%0A%0A_Enviado automáticamente por el sistema de asistencia._`;
+
+    whatsappLink.href = `https://wa.me/593982435261?text=${mensaje}`;
+  }
+
+
+
+  setInterval(() => {
+    if (cursoActual) {
+      loadAttendance();
+    }
+  }, 90000);
+
+  loadBtn.addEventListener('click', loadAttendance);
+  downloadBtn.addEventListener('click', downloadCSV);
+
+</script>
+
+
+</body>
+</html>
