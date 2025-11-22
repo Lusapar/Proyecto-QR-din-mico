@@ -156,7 +156,7 @@ app.get('/verify', (req, res) => {
          const tutor = course ? course.tutor : "Sin asignar";
          const phone = course ? course.phone : null;
 
-jjj
+
           db.all(
             `SELECT id, status FROM attendance 
              WHERE student_id = ? AND date = ? 
