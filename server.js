@@ -143,13 +143,19 @@ app.get('/verify', (req, res) => {
       if (hours > 7 || (hours === 7 && minutes > 10)) status = "atraso";
 
       db.get(
-        `SELECT tutor FROM courses 
-         WHERE LOWER(name) LIKE LOWER(?) 
-         OR LOWER(?) LIKE LOWER(name)
+         `SELECT tutor, phone FROM courses
+         WHERE LOWER(name) = LOWER(?)
+         OR LOWER(name) LIKE LOWER(?)
+         ORDER BY CASE 
+         WHEN LOWER(name) = LOWER(?) THEN 0
+         ELSE 1
+         END
          LIMIT 1`,
-        [`%${row.course}%`, row.course],
-        (err2, course) => {
-          const tutor = course ? course.tutor : "Sin asignar";
+         [row.course.trim(), `%${row.course.trim()}%`, row.course.trim()],
+         (err2, course) => {
+         const tutor = course ? course.tutor : "Sin asignar";
+         const phone = course ? course.phone : null;
+
 
           db.all(
             `SELECT id, status FROM attendance 
