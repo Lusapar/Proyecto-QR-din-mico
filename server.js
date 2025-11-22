@@ -3,16 +3,15 @@ const sqlite3 = require('sqlite3').verbose();
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
 const cors = require('cors');
-
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
-
+app.get("/", (req, res) => {
+  res.send("✔️ API Proyecto QR Dinámico funcionando. Usa /verify, /generate, etc.");
+});
 const db = new sqlite3.Database('./db.sqlite');
-db.run('PRAGMA foreign_keys = OFF;');
-
+db.run('PRAGMA foreign_keys = OFF;'); 
 const PORT = process.env.PORT || 3000;
-
 // 🔒 API KEY
 const API_KEY = process.env.GENERATE_API_KEY || 'clave_demo_123';
 
