@@ -20,6 +20,18 @@ function genToken(len = 24) {
   return crypto.randomBytes(len).toString('hex');
 }
 
+function abrirWhatsapp(phone, mensaje) {
+  if (!phone) return;
+
+  const numero = phone.replace(/\D/g, ""); // solo dígitos
+  const texto = encodeURIComponent(mensaje);
+
+  const url = `https://wa.me/${numero}?text=${texto}`;
+  window.open(url, "_blank");
+}
+abrirWhatsapp(phone, `✅ ${student.name} registró ${action.toUpperCase()} en ${student.course}`);
+
+
 // ⏰ Horario habilitado: desde 00:00 hasta antes de las 14:00
 function estaEnHorarioHabilitado() {
   const ahora = new Date();
@@ -31,6 +43,18 @@ function estaEnHorarioHabilitado() {
 
   // Habilitado solo desde 00:00 hasta 13:59
   return totalMin < limiteFinMin;
+}
+
+  function normalizarCurso(cursoRaw = "") {
+  const c = (" " + cursoRaw.toLowerCase() + " ");
+
+  if (c.includes(" a ") || c.includes(" a-") || c.includes(" a -")) {
+    return "A - Informática";
+  }
+  if (c.includes(" b ") || c.includes(" b-") || c.includes(" b -")) {
+    return "B - Informática";
+  }
+  return cursoRaw.trim();
 }
 
 
@@ -116,6 +140,9 @@ app.get('/verify', (req, res) => {
   }
 
   const now = Math.floor(Date.now() / 1000);
+
+
+
   db.get(
     `SELECT t.token, t.student_id, t.expires, t.revoked, 
             s.name, s.course, s.exp AS student_exp
@@ -140,21 +167,22 @@ app.get('/verify', (req, res) => {
 
       // Asistencia o atraso (según la hora)
       let status = "asistido";
-      if (hours > 7 || (hours === 7 && minutes > 10)) status = "atraso";
+      if (hours > 7 || (hours === 7 && minutes > 1)) status = "atraso";
+
+const cursoNorm = normalizarCurso(row.course);
+console.log("📌 curso raw:", row.course, "→ cursoNorm:", cursoNorm);
 
       db.get(
-         `SELECT tutor, phone FROM courses
-         WHERE LOWER(name) = LOWER(?)
-         OR LOWER(name) LIKE LOWER(?)
-         ORDER BY CASE 
-         WHEN LOWER(name) = LOWER(?) THEN 0
-         ELSE 1
-         END
-         LIMIT 1`,
-         [row.course.trim(), `%${row.course.trim()}%`, row.course.trim()],
-         (err2, course) => {
-         const tutor = course ? course.tutor : "Sin asignar";
-         const phone = course ? course.phone : null;
+  `SELECT tutor, phone FROM courses
+   WHERE LOWER(name) = LOWER(?)
+   LIMIT 1`,
+  [cursoNorm],
+  (err2, course) => {
+    const tutor = course ? course.tutor : "Sin asignar";
+    const phone = course ? course.phone : null;
+
+    // sigue tu db.all(...) normal aquí
+
 
 
           db.all(
