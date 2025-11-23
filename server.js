@@ -19,19 +19,6 @@ const API_KEY = process.env.GENERATE_API_KEY || 'clave_demo_123';
 function genToken(len = 24) {
   return crypto.randomBytes(len).toString('hex');
 }
-
-function abrirWhatsapp(phone, mensaje) {
-  if (!phone) return;
-
-  const numero = phone.replace(/\D/g, ""); // solo dígitos
-  const texto = encodeURIComponent(mensaje);
-
-  const url = `https://wa.me/${numero}?text=${texto}`;
-  window.open(url, "_blank");
-}
-abrirWhatsapp(phone, `✅ ${student.name} registró ${action.toUpperCase()} en ${student.course}`);
-
-
 // ⏰ Horario habilitado: desde 00:00 hasta antes de las 14:00
 function estaEnHorarioHabilitado() {
   const ahora = new Date();
@@ -56,7 +43,6 @@ function estaEnHorarioHabilitado() {
   }
   return cursoRaw.trim();
 }
-
 
 // Fecha muy lejana solo para rellenar la columna expires (ya NO se usa para lógica)
 const FAR_FUTURE_EXPIRES = Math.floor(
@@ -330,31 +316,30 @@ app.post('/register-attendance', (req, res) => {
 });
 
 // ===================== Rutas de consulta de asistencia =====================
-app.get('/attendance/:course', (req, res) => {
-  const { course } = req.params;
-
-  db.all(
-    'SELECT * FROM attendance WHERE course = ? ORDER BY date DESC',
-    [course],
-    (err, rows) => {
-      if (err) return res.status(500).json({ error: 'DB error' });
-      res.json(rows);
-    }
-  );
-});
-
 app.get('/attendance', (req, res) => {
   const { course } = req.query;
+
   let sql = `
-    SELECT a.student_id, s.name, a.course, a.tutor, a.status, a.date
+    SELECT 
+      a.student_id,
+      s.name,
+      a.course,
+      a.tutor,
+      c.phone,           
+      a.status,
+      a.date
     FROM attendance a
     LEFT JOIN students s ON s.id = a.student_id
+    LEFT JOIN courses c ON LOWER(c.name) = LOWER(a.course)
   `;
+
   const params = [];
+
   if (course) {
     sql += ' WHERE a.course = ?';
     params.push(course);
   }
+
   sql += ' ORDER BY a.date DESC';
 
   db.all(sql, params, (err, rows) => {
