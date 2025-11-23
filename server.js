@@ -320,18 +320,20 @@ app.get('/attendance', (req, res) => {
   const { course } = req.query;
 
   let sql = `
-    SELECT 
-      a.student_id,
-      s.name,
-      a.course,
-      a.tutor,
-      c.phone,           
-      a.status,
-      a.date
-    FROM attendance a
-    LEFT JOIN students s ON s.id = a.student_id
-    LEFT JOIN courses c ON LOWER(c.name) = LOWER(a.course)
-  `;
+  SELECT 
+    a.student_id,
+    s.name,
+    a.course,
+    COALESCE(a.tutor, c.tutor) AS tutor,
+    c.phone,
+    a.status,
+    a.date
+  FROM attendance a
+  LEFT JOIN students s ON s.id = a.student_id
+  LEFT JOIN courses c 
+    ON LOWER(TRIM(c.name)) = LOWER(TRIM(a.course))
+`;
+
 
   const params = [];
 
