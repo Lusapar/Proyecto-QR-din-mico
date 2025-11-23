@@ -362,13 +362,26 @@ app.get('/students', (req, res) => {
   });
 });
 
-// 🌙 A las 00:00 reactivar todos los tokens (nuevo día)
-setInterval(() => {
-  const now = new Date();
-  if (now.getHours() === 0 && now.getMinutes() === 0) {
-    db.run('UPDATE tokens SET revoked = 0');
-    console.log('🌙 Todos los QR reactivados automáticamente (nuevo día)');
+// 🔐 clave simple para que NADIE más llame este endpoint
+const CRON_KEY = process.env.CRON_KEY || "mi_clave_super_secreta";
+
+// ✅ endpoint que resetea tokens
+app.get("/cron/reset-tokens", (req, res) => {
+  const key = req.query.key;
+
+  if (key !== CRON_KEY) {
+    return res.status(403).json({ error: "No autorizado" });
   }
-}, 60000);
+
+  db.run("UPDATE tokens SET revoked = 0", function (err) {
+    if (err) {
+      console.error("❌ Error reseteando tokens:", err);
+      return res.status(500).json({ error: "DB error" });
+    }
+
+    console.log("🌙 Todos los QR reactivados automáticamente (cron externo)");
+    res.json({ ok: true, updated: this.changes });
+  });
+});
 
 app.listen(PORT, () => console.log(`✅ Servidor ejecutándose en puerto ${PORT}`));
