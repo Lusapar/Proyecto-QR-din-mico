@@ -19,18 +19,27 @@ const API_KEY = process.env.GENERATE_API_KEY || 'clave_demo_123';
 function genToken(len = 24) {
   return crypto.randomBytes(len).toString('hex');
 }
-// ⏰ Horario habilitado: desde 00:00 hasta antes de las 14:00
+
+// ⏰ Horario habilitado: 00:00 a 13:59 HORA DE ECUADOR (UTC-5)
 function estaEnHorarioHabilitado() {
   const ahora = new Date();
-  const horas = ahora.getHours();   // 0 - 23
-  const minutos = ahora.getMinutes();
-  const totalMin = horas * 60 + minutos;
 
-  const limiteFinMin = 14 * 60; // 14:00 → 14 * 60 = 840
+  // Hora del servidor en UTC
+  const horasUTC = ahora.getUTCHours();
+  const minutosUTC = ahora.getUTCMinutes();
 
-  // Habilitado solo desde 00:00 hasta 13:59
+  // Convertir a hora de Ecuador (UTC-5)
+  let horasEC = horasUTC - 5;
+  if (horasEC < 0) horasEC += 24;
+
+  const totalMin = horasEC * 60 + minutosUTC;
+
+  const limiteFinMin = 14 * 60; // 14:00 (hora de Ecuador)
+
+  // Habilitado solo desde 00:00 hasta 13:59 en Ecuador
   return totalMin < limiteFinMin;
 }
+
 
   function normalizarCurso(cursoRaw = "") {
   const c = (" " + cursoRaw.toLowerCase() + " ");

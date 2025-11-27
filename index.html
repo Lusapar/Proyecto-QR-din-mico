@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Panel de Asistencia - Administración</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="icon" href="/imagenes/images.jpeg">
   <style>
     body {
       background: #fefefe;
@@ -45,7 +46,10 @@
     <p><strong>✅ Asistidos:</strong> <span id="countAsistidos">0</span></p>
     <p><strong>⚠️ Atrasos:</strong> <span id="countAtrasos">0</span></p>
     <p><strong>❌ No Asistieron:</strong> <span id="countNoAsistidos">0</span></p>
-    <a id="whatsappLink" target="_blank" class="btn-whatsapp mt-4 inline-block">📱 Enviar Reporte al Tutor</a>
+    <button id="whatsappLink" type="button" class="btn-whatsapp">
+     📲 Enviar Reporte al Tutor
+    </button>
+
   </div>
 
   <h2 id="titleAsistencias" class="text-xl font-semibold mb-2 hidden">🧾 Asistencias de Hoy</h2>
@@ -76,7 +80,6 @@
   </table>
 
 <script>
-
   const loadBtn = document.getElementById('loadBtn');
   const downloadBtn = document.getElementById('downloadBtn');
   const tableAttendance = document.getElementById('tableAttendance');
@@ -88,18 +91,18 @@
   const courseSelect = document.getElementById('courseSelect');
 
   const apiBase = "https://proyecto-qr-din-mico.onrender.com";  
-  let cursoActual = "";                     
+  let cursoActual = "";
 
-
+  // =========================
+  // DESCARGAR CSV
+  // =========================
   async function downloadCSV() {
     const course = courseSelect.value;
     if (!course) return alert("Selecciona un curso primero");
 
     cursoActual = course;
-
     const today = new Date().toISOString().split("T")[0];
 
-    
     const studentsRes = await fetch(`${apiBase}/students?course=${encodeURIComponent(course)}`);
     const studentsAll = await studentsRes.json();
 
@@ -108,17 +111,17 @@
 
     const mapToday = {};
     attendances.forEach(a => {
-      if (a.date === today) mapToday[a.student_id] = a;
+      if (a.date === today) mapToday[String(a.student_id)] = a;
     });
 
     let csv = "ID,Nombre,Curso,Tutor,Estado,Fecha\n";
 
     studentsAll.forEach(s => {
-      const record = mapToday[s.id];
+      const record = mapToday[String(s.id)];
       if (record) {
-        csv += `${s.id},"${s.name}",${s.course},${record.tutor},${record.status},${record.date}\n`;
+        csv += `${s.id},"${s.name}","${s.course}",${record.tutor},${record.status},${record.date}\n`;
       } else {
-        csv += `${s.id},"${s.name}",${s.course},,no asistió,${today}\n`;
+        csv += `${s.id},"${s.name}","${s.course}",,no asistió,${today}\n`;
       }
     });
 
@@ -129,12 +132,14 @@
     dlLink.click();
   }
 
-
+  // =========================
+  // CARGAR ASISTENCIA
+  // =========================
   async function loadAttendance() {
     const course = courseSelect.value;
     if (!course) return alert("Selecciona un curso primero");
 
-    cursoActual = course; // 🔁 guardamos el curso elegido
+    cursoActual = course;
     const today = new Date().toISOString().split('T')[0];
 
     const res = await fetch(`${apiBase}/attendance?course=${encodeURIComponent(course)}`);
@@ -145,14 +150,12 @@
 
     const hoy = data.filter(r => r.date === today);
 
-  
     let asistidos = 0;
     let atrasos = 0;
-
     const atrasadosNombres = [];
     const noAsistidosNombres = [];
 
-
+    // Tabla asistencias de hoy
     hoy.forEach(r => {
       if (r.status === "asistido") asistidos++;
       else if (r.status === "atraso") {
@@ -172,14 +175,12 @@
       `);
     });
 
-
-
+    // Obtener lista total de estudiantes del curso
     const resStudents = await fetch(`${apiBase}/students?course=${encodeURIComponent(course)}`);
     const studentsAll = await resStudents.json();
 
-    const asistidosIds = new Set(hoy.map(r => r.student_id));
-
-    const ausentes = studentsAll.filter(s => !asistidosIds.has(s.id));
+    const asistidosIds = new Set(hoy.map(r => String(r.student_id)));
+    const ausentes = studentsAll.filter(s => !asistidosIds.has(String(s.id)));
 
     ausentes.forEach(a => {
       noAsistidosNombres.push(a.name);
@@ -194,7 +195,7 @@
 
     const noAsistidos = ausentes.length;
 
-   
+    // Stats
     document.getElementById('countAsistidos').textContent = asistidos;
     document.getElementById('countAtrasos').textContent = atrasos;
     document.getElementById('countNoAsistidos').textContent = noAsistidos;
@@ -205,8 +206,9 @@
     document.getElementById('titleAsistencias').classList.remove('hidden');
     document.getElementById('titleNoAsistidos').classList.remove('hidden');
 
-
+    // Mensaje WhatsApp
     const tutor = hoy.length ? hoy[0].tutor : "Tutor no encontrado";
+    const phone = hoy.length ? hoy[0].phone : null;
     const fecha = new Date().toLocaleDateString('es-EC');
 
     let mensaje =
@@ -223,20 +225,35 @@
     }
     mensaje += `%0A%0A_Enviado automáticamente por el sistema de asistencia._`;
 
-    whatsappLink.href = `https://wa.me/593982435261?text=${mensaje}`;
+    if (phone) {
+      const numero = String(phone).replace(/\D/g, "");
+      const url = `https://wa.me/${numero}?text=${mensaje}`;
+
+      whatsappLink.dataset.url = url;
+      whatsappLink.style.pointerEvents = "auto";
+      whatsappLink.style.opacity = "1";
+    } else {
+      whatsappLink.dataset.url = "";
+      whatsappLink.style.pointerEvents = "none";
+      whatsappLink.style.opacity = "0.6";
+      console.warn("⚠️ Este curso no tiene teléfono asignado");
+    }
   }
 
-
-
-  setInterval(() => {
-    if (cursoActual) {
-      loadAttendance();
-    }
-  }, 90000);
-
+  // =========================
+  // LISTENERS Y AUTO-REFRESH (SOLO UNA VEZ)
+  // =========================
   loadBtn.addEventListener('click', loadAttendance);
   downloadBtn.addEventListener('click', downloadCSV);
 
+  whatsappLink.addEventListener("click", () => {
+    const url = whatsappLink.dataset.url;
+    if (url) window.open(url, "_blank");
+  });
+
+  setInterval(() => {
+    if (cursoActual) loadAttendance();
+  }, 90000);
 </script>
 
 
